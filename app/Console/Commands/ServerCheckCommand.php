@@ -77,18 +77,13 @@ class ServerCheckCommand extends Command
             'processName' => $processName,
             'runningProcessStatus' => $runningProcessStatus,
         ]);
-
-        dd($runningProcessStatus);
         if ($runningProcessStatus) {
             $this->info("$fullHostPath previous state was : running | Lets run another check");
             $this->ping($host);
         } else {
             $this->error("$fullHostPath is not running");
             $this->info("Killing the $processName process");
-
-            dump($fullHostPath);
-            dd($processName);
-         //   $this->killProcess($processName);
+            $this->killProcess($processName);
         }
 
         return 0;
