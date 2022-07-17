@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\ServerCheckService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 
@@ -12,14 +13,9 @@ class ServerCheckCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'server:check {--all=null} {--host=}';
+    protected $signature = 'server:check {--all} {--host=}';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Ping server and check if it is alive. If not trigger restart command';
+    protected ServerCheckService $serverCheckService;
 
     /**
      * Execute the console command.
@@ -28,34 +24,87 @@ class ServerCheckCommand extends Command
      */
     public function handle()
     {
+        $this->serverCheckService =  new \App\Services\ServerCheckService();;
+        $host = $this->option('host');
+
         $all = $this->option('all');
+
+        if (!$host && !$all) {
+            $ask =$this->askWithCompletion('Please enter hostname or all',
+                ['all', 'artisan', 'nest', 'vue']);
+            if ($ask == 'all') {
+                $all = true;
+            } elseif ($ask == 'artisan') {
+                $host = 'artisan';
+            } elseif ($ask == 'nest') {
+                $host = 'nest';
+            } elseif ($ask == 'vue') {
+                $host = 'vue';
+            }
+        }
+
         if ($all) {
             $this->info('Checking all servers');
             $this->pingAll();
             return 0;
         }
 
-        $host = $this->option('host');
         $baseUrl = env('APP_DOCKER_BASE_URL') ;
         if (!$host) {
             $choice = $this->askWithCompletion('Please specify the host of app name to check', [
-                'Classification Api  => ' . "$baseUrl" . "3000",
-                'Vue Music Api  => ' . "$baseUrl" . "8080",
-                'Laravel Backend Api => ' . "$baseUrl" . "8899",
+                'Classification Api (nest) => ' . "$baseUrl" . "3000",
+                'Vue Music Api  (vue)=> ' . "$baseUrl" . "8080",
+                'Laravel Backend Api (artisan) => ' . "$baseUrl" . "8899",
             ]);
             $fullHostPath = explode(' => ', $choice);
             $fullHostPath = $fullHostPath[1];
         }
         else {
-            $fullHostPath = $host;
+            $port = $this->serverCheckService->getPort($host);
+
+            dump([
+                'host' => $host,
+                'port' => $port
+            ]);
+            $fullHostPath = $baseUrl .  $port;
         }
-        $this->ping($fullHostPath);
+
+        $processName = $this->getCheckProcessName($host);
+        $runningProcessStatus = $this->checkRunningProcess($processName);
+
+        dump([
+            'host' => $fullHostPath,
+            'processName' => $processName,
+            'runningProcessStatus' => $runningProcessStatus,
+        ]);
+
+        dd($runningProcessStatus);
+        if ($runningProcessStatus) {
+            $this->info("$fullHostPath previous state was : running | Lets run another check");
+            $this->ping($host);
+        } else {
+            $this->error("$fullHostPath is not running");
+            $this->info("Killing the $processName process");
+
+            dump($fullHostPath);
+            dd($processName);
+         //   $this->killProcess($processName);
+        }
 
         return 0;
     }
 
-    public function ping($fullHostPath)
+    public function ping($host)
     {
+        $baseUrl = env('APP_DOCKER_BASE_URL') ;
+
+        if ($host === $this->getCheckProcessName($host)) {
+            $port = $this->serverCheckService->getPort($host);
+        }
+        else {
+            $port = $host;
+        }
+        $fullHostPath = $baseUrl . $port;
         try {
             $response = Http::get($fullHostPath);
             $this->info("$fullHostPath is alive. Status : " . $response->status());
@@ -64,8 +113,6 @@ class ServerCheckCommand extends Command
             $this->error('Triggering restart command for ' . $fullHostPath);
 
             $port = explode(':', $fullHostPath);
-            $this->call("server:restart", ['--app' => $port[2]]);
-
             info("$fullHostPath Server is not alive . Please check");
 
             $response = Http::Post(env('APP_DOCKER_BASE_URL') . "8899/api/ping",
@@ -77,6 +124,7 @@ class ServerCheckCommand extends Command
             );
 
             $this->info("$response from Laravel backend");
+
             return 1;
         }
     }
@@ -84,12 +132,72 @@ class ServerCheckCommand extends Command
     public function pingAll()
     {
         $servers = [
-            env('APP_DOCKER_BASE_URL') . "3000",
-            env('APP_DOCKER_BASE_URL') . "8080",
-            env('APP_DOCKER_BASE_URL') . "8899",
+            "3000",
+            "8080",
+            "8899",
         ];
         foreach ($servers as $server) {
             $this->ping($server);
         }
     }
+
+    private function checkRunningProcess(string $name) : bool
+    {
+        return $this->serverCheckService->checkRunningProcess($name);
+    }
+
+    private function killProcess(bool|array|string|null $processName)
+    {
+        $serverProcess = "ps -ef | grep $processName | grep -v grep | awk '{print $2}'";
+
+        $this->getRunningProcesses($processName);
+
+
+        $getProcesses = shell_exec($serverProcess);
+        $getProcesses = explode("\n", $getProcesses);
+        foreach ($getProcesses as $process) {
+            if ($process) {
+                $this->output->caution('Killing process  : '. $process);
+                $killProcess = "kill $process";
+                shell_exec($killProcess);
+            }
+        }
+
+        $processRunningSinceCmd = $this->getRunningProcesses($processName)['processRunningSince'];
+        $processPathCmd = $this->getRunningProcesses($processName)['processPath'];
+        $serverProcessCommandCmd = $this->getRunningProcesses($processName)['serverProcessCommand'];
+        // put results in a table
+        $this->table(
+            ['processName', 'processRunningSince', 'processPath', 'serverProcessCommand'],
+            [
+                [$processName, $processRunningSinceCmd, $processPathCmd, $serverProcessCommandCmd],
+            ]
+        );
+
+        return 0;
+    }
+
+    /**
+     * @param bool|array|string|null $processName
+     * @return array
+     */
+    public function getRunningProcesses(bool|array|string|null $processName): array
+    {
+        return $this->serverCheckService->getRunningProcesses($processName);
+    }
+
+    /**
+     * @param int|string $host
+     * @return string|int
+     */
+    public function getCheckProcessName(int|string $host): string|int
+    {
+        if ((int)$host > 0) {
+            $processName = $this->serverCheckService->getProcessName($host);
+        } else {
+            $processName = $host;
+        }
+        return $processName;
+    }
+
 }

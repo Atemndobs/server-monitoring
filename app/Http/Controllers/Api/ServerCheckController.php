@@ -9,6 +9,16 @@ use Illuminate\Support\Facades\Http;
 
 class ServerCheckController extends Controller
 {
+    public ServerCheckService $serverCheckService;
+
+    /**
+     * @param ServerCheckService $serverCheckService
+     */
+    public function __construct(ServerCheckService $serverCheckService)
+    {
+        $this->serverCheckService = $serverCheckService;
+    }
+
     public function appHealthCheck()
     {
         $res = Http::post("127.0.0.1:8899/api/ping", [
@@ -27,24 +37,28 @@ class ServerCheckController extends Controller
 
     public function serverHealthcheck()
     {
-        $service = new ServerCheckService();
-
-        $processes = $service->checkServerProcesses();
-        $processes = explode("\n", $processes);
-
         return response(([
             'status' => 'success',
-            'response' => $processes,
+            'response' => [
+                'nest | 3000' => $this->nestStatus(),
+                'vue | 8080' => $this->vueStatus(),
+                'artisan | 8899' => $this->artisanStatus(),
+            ],
         ]));
     }
 
     public function nestStatus()
     {
-
+        return  $this->serverCheckService->getRunningProcesses('nest');
     }
 
     public function vueStatus()
     {
+        return  $this->serverCheckService->getRunningProcesses('vue');
+    }
 
+    public function artisanStatus()
+    {
+        return  $this->serverCheckService->getRunningProcesses('artisan');
     }
 }

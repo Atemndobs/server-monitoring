@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Facade;
+use Spatie\Health\Checks\Checks\ScheduleCheck;
 use Studio\Totem\Providers\TotemServiceProvider;
 
 return [
@@ -196,6 +197,7 @@ return [
         // App\Providers\BroadcastServiceProvider::class,
         App\Providers\EventServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
+        //ScheduleCheck::class,
 
     ],
 

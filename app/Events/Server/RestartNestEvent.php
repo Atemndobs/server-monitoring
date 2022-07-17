@@ -2,6 +2,7 @@
 
 namespace App\Events\Server;
 
+use App\Models\Process;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PresenceChannel;
@@ -14,14 +15,16 @@ class RestartNestEvent
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
+    public Process $process;
     /**
      * Create a new event instance.
      *
      * @return void
      */
-    public function __construct()
+    public function __construct(Process $process)
     {
-        //
+        $this->process = $process;
+        info('Restarting Nest__________________________________________________________');
     }
 
     /**

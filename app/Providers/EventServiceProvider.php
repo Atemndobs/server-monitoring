@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Events\Server\RestartArtisanEvent;
+use App\Events\Server\RestartNestEvent;
+use App\Events\Server\RestartVueEvent;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
@@ -17,6 +20,15 @@ class EventServiceProvider extends ServiceProvider
     protected $listen = [
         Registered::class => [
             SendEmailVerificationNotification::class,
+        ],
+        RestartNestEvent::class => [
+            \App\Listeners\Server\RestartNestListener::class,
+        ],
+        RestartVueEvent::class => [
+            \App\Listeners\Server\RestartVueListener::class,
+        ],
+        RestartArtisanEvent::class => [
+            \App\Listeners\Server\RestartLaravelListener::class,
         ],
     ];
 

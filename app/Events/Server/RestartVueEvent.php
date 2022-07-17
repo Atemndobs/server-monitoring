@@ -14,14 +14,16 @@ class RestartVueEvent
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
+    public string $app;
     /**
      * Create a new event instance.
      *
      * @return void
      */
-    public function __construct()
+    public function __construct(string $app)
     {
-        //
+        $this->app = $app;
+        info('Restarting VUE JS __________________________________________________________'. $app);
     }
 
     /**

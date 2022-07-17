@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Events\Server\RestartNestEvent;
+use App\Events\Server\RestartVueEvent;
 use App\Jobs\Server\RestartArtisanJob;
 use App\Jobs\Server\RestartNestJob;
 use App\Jobs\Server\RestartVueJob;
@@ -31,21 +33,24 @@ class AppCheckCommand extends Command
     public function handle()
     {
         $app = $this->option('app');
-        if (!$app) {
-            $this->error('Please specify the app to restart');
-            return 1;
-        }
 
         if ((int)($app)) {
             $app = $this->getAppName($app);
         }
-        $this->info('Checking app ' . $app);
-        if ($app=="nest" || $app=="nest"){
-            $this->getNodeProcess($app);
+
+        dd($app);
+
+        if (!$app) {
+            $this->error('Please specify the app to restart');
+            return 1;
         }
+        $this->info('Checking app ' . $app);
 
         if ($app=="artisan"){
-
+            $this->checkArtisan($app);
+        }else{
+            dump($app);
+            $this->getNodeProcess($app);
         }
         return 0;
     }
@@ -57,8 +62,8 @@ class AppCheckCommand extends Command
     private function getAppName(int $app): bool|int|string
     {
         $servers = [
-            'vue' =>  "3000",
-            'nest' =>  "8080",
+            'nest' =>  "3000",
+            'vue' =>  "8080",
             'artisan' =>  "8899",
         ];
 
@@ -95,23 +100,32 @@ class AppCheckCommand extends Command
             $candidates[] = $systemProcesses[1];
         }
 
-        $deleted = implode(' ', $candidates);
-        shell_exec("kill  $deleted");
-        $this->output->caution('Deleted processes  : '.implode(' | ', $candidates));
+       // $deleted = implode(' ', $candidates);
+        //shell_exec("kill  $deleted");
+       //
 
         if ($nodeProcesses == 'vue') {
-            dispatch(new RestartVueJob());
+            //dispatch(new RestartVueJob());
+            $this->output->info(" Restarting Vuejs on port 8080");
+
+            RestartVueEvent::dispatch($nodejsProcess);
+            dump('EOL___________________ ');
+
+        }
+        if ($nodeProcesses == 'nest') {
+            //dispatch(new RestartNestJob());
+            $this->output->info(" Restarting Nestjs on port 3000");
+            RestartNestEvent::dispatch($nodejsProcess);
+            dump('EOL___________________');
         }
 
-        if ($nodeProcesses == 'nest') {
-            dispatch(new RestartVueJob());
-        }
+
     }
 
     public function checkArtisan(string $artisan)
     {
         $processes = shell_exec("ps -aef | grep $artisan | grep php");
-        dispatch(new RestartArtisanJob());
+        //dispatch(new RestartArtisanJob());
     }
 
 }
