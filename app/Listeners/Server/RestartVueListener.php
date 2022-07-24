@@ -4,26 +4,32 @@ namespace App\Listeners\Server;
 
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Support\Facades\Http;
 
 class RestartVueListener
 {
     /**
-     * Create the event listener.
+     * Handle the event.
      *
+     * @param $event
      * @return void
      */
-    public function __construct()
+    public function handle($event)
     {
-        dump('RestartVueListener');
-        $this->restartVue();
-    }
-
-    public function restartVue()
-    {
-        //"cd ~/sites/curator/music-player && npm run serve --fix &"
-        $cmd =  "cd ~/sites/curator/music-player && npm run serve --fix & disown";
-        $shell = shell_exec($cmd);
-        info($shell);
-        return $shell;
+        $process = $event->process;
+        if ($process) {
+            dump("Delete Process FromDB $process->name");
+            $process->delete();
+        }
+        try {
+            Http::post(env('APP_DOCKER_BASE_URL').'/api/ping', [
+                'process_id' => $event->process->id,
+                'status' => 'deleted',
+                'name' => $process->name,
+                'message' => 'Nest Process Deleted',
+            ]);
+        }catch (\Exception $e) {
+            dump($e->getMessage());
+        }
     }
 }

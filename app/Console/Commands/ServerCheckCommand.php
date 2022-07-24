@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Process;
 use App\Services\ServerCheckService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
@@ -77,12 +78,16 @@ class ServerCheckCommand extends Command
             'processName' => $processName,
             'runningProcessStatus' => $runningProcessStatus,
         ]);
+
+
         if ($runningProcessStatus) {
             $this->info("$fullHostPath previous state was : running | Lets run another check");
             $this->ping($host);
         } else {
             $this->error("$fullHostPath is not running");
             $this->info("Killing the $processName process");
+            $this->warn("Deleting the $processName process from DB");
+            $this->deleteProcessByName($processName);
             $this->killProcess($processName);
         }
 
@@ -141,24 +146,40 @@ class ServerCheckCommand extends Command
         return $this->serverCheckService->checkRunningProcess($name);
     }
 
+    /**
+     * @param string $name
+     * @return bool
+     */
+    public function deleteProcessByName(string $name)
+    {
+        $process = Process::query()->where('name', $name)->first();
+        /** @var Process $process */
+        if ($process) {
+            //shell_exec("kill -9 " . $process->pid);
+            $process->delete();
+        }
+        return true;
+    }
+
     private function killProcess(bool|array|string|null $processName)
     {
         $serverProcess = "ps -ef | grep $processName | grep -v grep | awk '{print $2}'";
-
+        $fullProcess = shell_exec("ps -ef | grep $processName | grep -v grep");
         $this->getRunningProcesses($processName);
-
 
         $getProcesses = shell_exec($serverProcess);
         $getProcesses = explode("\n", $getProcesses);
         foreach ($getProcesses as $process) {
-            if ($process) {
+            if(str_contains($fullProcess, 'php artisan server:check')) {
+                continue;
+            }elseif ($process) {
                 $this->output->caution('Killing process  : '. $process);
                 $killProcess = "kill $process";
                 shell_exec($killProcess);
             }
         }
 
-        $processRunningSinceCmd = $this->getRunningProcesses($processName)['processRunningSince'];
+/*        $processRunningSinceCmd = $this->getRunningProcesses($processName)['processRunningSince'];
         $processPathCmd = $this->getRunningProcesses($processName)['processPath'];
         $serverProcessCommandCmd = $this->getRunningProcesses($processName)['serverProcessCommand'];
         // put results in a table
@@ -167,7 +188,7 @@ class ServerCheckCommand extends Command
             [
                 [$processName, $processRunningSinceCmd, $processPathCmd, $serverProcessCommandCmd],
             ]
-        );
+        );*/
 
         return 0;
     }

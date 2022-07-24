@@ -2,6 +2,7 @@
 
 namespace App\Events\Server;
 
+use App\Models\Process;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PresenceChannel;
@@ -14,16 +15,16 @@ class RestartVueEvent
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public string $app;
+    public Process $process;
     /**
      * Create a new event instance.
      *
      * @return void
      */
-    public function __construct(string $app)
+    public function __construct(Process $process)
     {
-        $this->app = $app;
-        info('Restarting VUE JS __________________________________________________________'. $app);
+        $this->process = $process;
+        info('Restarting Vue__________________________________________________________');
     }
 
     /**

@@ -30,22 +30,31 @@ class ServerCheckService
             $command = explode("/", $pidAndCommand)[1];
             $command = str_replace("\n", "", $command);
         }catch (\Exception $e) {
-            $netstat = explode("\n", $netstat);
-            $netstat = array_filter($netstat);
-            // remove empty array element containing "tcp6"
-            $netstat = array_filter($netstat, function ($value) {
-                return strpos($value, 'tcp6') === false;
-            });
-            $netstat = $netstat[0];
-            $netstat = explode(" ", $netstat);
-            $netstat = array_filter($netstat);
-            // reset array keys
-            $netstat = array_values($netstat);
-            $pid = $netstat[4];
-            if ((int)$pid <= 0) {
-                $pid = 9999999;
+            if (!$netstat) {
+                dump("$url is not running");
+                return false;
             }
-            $command = $netstat[3];
+            try {
+                $netstat = explode("\n", $netstat);
+                $netstat = array_filter($netstat);
+                // remove empty array element containing "tcp6"
+                /*            $netstat = array_filter($netstat, function ($value) {
+                                return strpos($value, 'tcp6') === false;
+                            });*/
+                $netstat = $netstat[0];
+                $netstat = explode(" ", $netstat);
+                $netstat = array_filter($netstat);
+                // reset array keys
+                $netstat = array_values($netstat);
+                $pid = $netstat[4];
+                if ((int)$pid <= 0) {
+                    $pid = 9999999;
+                }
+                $command = $netstat[3];
+            }catch (\Exception $e) {
+                $pid = 9999999;
+                $command = "";
+            }
         }
 
         dump([
@@ -85,7 +94,7 @@ class ServerCheckService
             foreach ($processes as $process) {
                 dump([
                     'process' => $process->pid,
-                    'pif' => $pid,
+                    'pid' => $pid,
                     'candidate' => $process->pid == $pid,
                 ]);
                 if ($process->pid == $pid ) {
@@ -202,6 +211,7 @@ class ServerCheckService
             $process->status = 'running';
             $process->url = $url;
             $process->port = $port;
+            $process->started_at = now();
             $process->last_checked_at = date('Y-m-d H:i:s');
             $process->saveQuietly();
             return $process->toArray();
@@ -221,7 +231,9 @@ class ServerCheckService
         $name = ucfirst($name);
 
         $eventName = "App\Events\Server\Restart$name"."Event";
+        // Inform the backend Server about Deleted Process
         event(new $eventName($process));
+        $process->delete();
 
     }
 
