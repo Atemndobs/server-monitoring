@@ -38,8 +38,6 @@ class AppCheckCommand extends Command
             $app = $this->getAppName($app);
         }
 
-        dd($app);
-
         if (!$app) {
             $this->error('Please specify the app to restart');
             return 1;
